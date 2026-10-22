@@ -101,6 +101,14 @@ function renderStat() {
   const total = items.length, done = items.filter(i => i.done).length;
   $('#stat').textContent = total ? `チェック済み ${done} / ${total}` : '';
 }
+// 「● 単語　○ メモ」のように1回押すだけで切り替わるボタン
+function kindToggle(name, type, inDraft = false) {
+  const f = inDraft ? ' data-f="type"' : '';
+  return `<div class="kindtoggle" role="radiogroup" aria-label="種類">
+    <label><input type="radio" name="${name}" value="word"${f}${type === 'word' ? ' checked' : ''}><span>単語</span></label>
+    <label><input type="radio" name="${name}" value="memo"${f}${type === 'memo' ? ' checked' : ''}><span>メモ</span></label>
+  </div>`;
+}
 function itemHTML(it, q, inGroup) {
   const cls = `item${inGroup ? ' in-group' : ''}`;
   if (editingId === it.id) {
@@ -111,7 +119,7 @@ function itemHTML(it, q, inGroup) {
         <div class="row2">
           <label class="field"><span>日付</span><input class="inp" type="date" id="e-date" value="${it.date}"></label>
           <label class="field"><span>グループ</span><input class="inp" id="e-group" value="${esc(it.group)}" placeholder="なし"></label>
-          <label class="field"><span>種類</span><select class="inp" id="e-type"><option value="word"${it.type === 'word' ? ' selected' : ''}>単語</option><option value="memo"${it.type === 'memo' ? ' selected' : ''}>メモ</option></select></label>
+          <div class="field"><span>種類</span>${kindToggle('e-type', it.type)}</div>
         </div>
         <div class="actions">
           <button class="btn danger${armedDelete === it.id ? ' armed' : ''}" data-act="del">${armedDelete === it.id ? 'もう一度押すと削除' : '削除'}</button>
@@ -174,7 +182,7 @@ $('#view-list').addEventListener('click', e => {
     const it = items.find(i => i.id === id);
     const patch = {
       text: $('#e-text').value.trim() || it.text, note: $('#e-note').value.trim(),
-      date: $('#e-date').value || it.date, group: $('#e-group').value.trim(), type: $('#e-type').value
+      date: $('#e-date').value || it.date, group: $('#e-group').value.trim(), type: document.querySelector('input[name="e-type"]:checked')?.value || it.type
     };
     editingId = null; document.activeElement?.blur();
     updateDoc(ref(id), patch).catch(fail); renderList(); toast('保存しました'); return;
@@ -193,8 +201,8 @@ let draft = [];
 function renderDraft() {
   $('#plist').innerHTML = draft.map((it, i) => `
     <div class="prev-item" data-i="${i}">
-      <select class="kind" data-f="type" aria-label="種類"><option value="word"${it.type === 'word' ? ' selected' : ''}>単語</option><option value="memo"${it.type === 'memo' ? ' selected' : ''}>メモ</option></select>
       <div class="fields">
+        ${kindToggle('k-' + i, it.type, true)}
         <input class="inp" data-f="text" value="${esc(it.text)}" aria-label="単語">
         <input class="inp" data-f="note" value="${esc(it.note)}" placeholder="補足（なし）" aria-label="補足">
         <input class="inp" data-f="group" value="${esc(it.group)}" placeholder="グループ（なし）" aria-label="グループ">
