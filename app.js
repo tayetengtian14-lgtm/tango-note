@@ -1,5 +1,6 @@
 import { firebaseConfig } from './firebase-config.js';
 import { parse } from './parse.js';
+import { createAmino, DEFAULT_SETTINGS } from './amino.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword,
@@ -7,7 +8,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-  collection, doc, onSnapshot, updateDoc, deleteDoc, writeBatch
+  collection, doc, onSnapshot, updateDoc, deleteDoc, writeBatch, setDoc, increment
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const $ = s => document.querySelector(s);
@@ -35,10 +36,19 @@ const auth = getAuth(app);
 // オフラインでも使えるように端末内にも保存し、つながったら自動で送る
 const db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
 
-let user = null, items = [], unsub = null;
+let user = null, items = [], unsub = null, unsubAmino = null;
 const col = () => collection(db, 'users', user.uid, 'items');
 const ref = id => doc(db, 'users', user.uid, 'items', id);
 const fail = e => { console.error(e); toast('保存できませんでした。もう一度試してください'); };
+
+/* ---------- アミノ酸ドリル（成績は users/{uid}/meta/amino に保存） ---------- */
+const aminoRef = () => doc(db, 'users', user.uid, 'meta', 'amino');
+const amino = createAmino($('#view-amino'), {
+  // PCとiPhoneで同時に答えても数がずれないよう、足し算で保存する
+  onAnswer: (one, ok) => setDoc(aminoRef(), { stats: { [one]: { [ok ? 'ok' : 'ng']: increment(1) } } }, { merge: true }).catch(fail),
+  onSettings: s => setDoc(aminoRef(), { settings: s }, { merge: true }).catch(fail),
+  onReset: s => setDoc(aminoRef(), { stats: {}, settings: s }).catch(fail)
+});
 
 /* ---------- ログイン ---------- */
 const AUTH_ERR = {
@@ -71,6 +81,7 @@ $('#logoutBtn').addEventListener('click', () => signOut(auth));
 
 onAuthStateChanged(auth, u => {
   if (unsub) { unsub(); unsub = null; }
+  if (unsubAmino) { unsubAmino(); unsubAmino = null; }
   user = u; items = [];
   if (!u) { showView('auth'); return; }
   showView('app');
@@ -82,6 +93,8 @@ onAuthStateChanged(auth, u => {
     s.textContent = pending ? (navigator.onLine ? '送信中' : 'オフライン（あとで同期）') : '同期済み';
     if (!$('#view-list').hidden) renderList(); else renderStat();
   }, err => { console.error(err); toast('データを読み込めませんでした（' + err.code + '）'); });
+  unsubAmino = onSnapshot(aminoRef(), snap => amino.setData(snap.data() || { settings: DEFAULT_SETTINGS }),
+    err => console.error(err));
   if (pendingImport) { $('#ocr').value = pendingImport; pendingImport = null; showTab('import'); runParse(); }
   else showTab('list');
 });
@@ -248,9 +261,13 @@ $('#commit').addEventListener('click', () => {
 function showTab(t) {
   $('#tab-list').setAttribute('aria-selected', t === 'list');
   $('#tab-import').setAttribute('aria-selected', t === 'import');
+  $('#tab-amino').setAttribute('aria-selected', t === 'amino');
   $('#view-list').hidden = t !== 'list'; $('#tools').hidden = t !== 'list'; $('#view-import').hidden = t !== 'import';
+  $('#view-amino').hidden = t !== 'amino';
   if (t === 'list') renderList(); else renderStat();
+  if (t === 'amino') amino.show();
 }
 $('#tab-list').addEventListener('click', () => showTab('list'));
 $('#tab-import').addEventListener('click', () => showTab('import'));
+$('#tab-amino').addEventListener('click', () => showTab('amino'));
 window.addEventListener('online', () => renderStat());

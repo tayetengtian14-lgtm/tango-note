@@ -1,7 +1,7 @@
 // アプリの画面とFirebaseのプログラムを端末に保存して、電波がなくても開けるようにする
 // 新しい版をアップロードしたときは、ネットにつながっていれば新しい方が使われる（ネット優先）
-const CACHE = 'tango-note-v2';
-const SHELL = ['./', './index.html', './style.css', './app.js', './parse.js', './firebase-config.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-180.png'];
+const CACHE = 'tango-note-v3';
+const SHELL = ['./', './index.html', './style.css', './app.js', './parse.js', './amino.js', './firebase-config.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-180.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
